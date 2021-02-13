@@ -7,7 +7,7 @@ Gooey experiements forked off of the three.js repo. Mostly it's slight modificat
 
  1. Go to the Oculus browser in your headset
  1. Type in: https://francois-laberge-bose.github.io/three.js/
- 1. TODO: Make a short link! :)
+ 1. Altneratively, use this: https://bit.ly/3tUuKWq
 
 ### Running Demos Locally
 
