@@ -11,8 +11,12 @@
 		<div id="info">
 			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> vr - dragging
 		</div>
+		<audio controls autoplay class="outputAudioEl" style="position: absolute; opacity: 0.0; width: 100%; height: 75px; margin: 30px 0 0 0;"></audio>
 
-		<script src="https://cdn.jsdelivr.net/npm/yjs@13.0.0-98/dist/yjs.mjs" type="module"></script>
+		
+		<script src="./js/vendors/HighFidelityAudio-latest.js"></script>
+		<!-- <script src="https://cdn.jsdelivr.net/npm/yjs@13.0.0-98/dist/yjs.mjs" type="module"></script> -->
+		
 		<script type="module">
 
 			import * as THREE from '../build/three.module.js';
@@ -22,7 +26,7 @@
 			// import * as Y from '../node_modules/yjs/dist/yjs.mjs'
 			//console.log(Y)
 
-
+			
 
 			let container;
 			let camera, scene, renderer;
@@ -35,6 +39,8 @@
 			const tempMatrix = new THREE.Matrix4();
 
 			let controls, group;
+			let callButton;
+			let callInitiated = false;
 
 			init();
 			animate();
@@ -116,6 +122,35 @@
 
 				}
 
+				function createCallButton(){
+					const geometry = geometries[ 0 ];
+					const material = new THREE.MeshStandardMaterial( {
+						color: 0xff0000,
+						roughness: 0.7,
+						metalness: 0.0
+					} );
+
+					const object = new THREE.Mesh( geometry, material );
+
+					object.position.x = 0;
+					object.position.y = 1;
+					object.position.z = -1;
+
+					object.rotation.x = 0;
+					object.rotation.y = 0;
+					object.rotation.z = 0;
+
+					object.scale.setScalar( 1.0 );
+
+					object.castShadow = true;
+					object.receiveShadow = true;
+
+					group.add( object );
+					return object;
+				}
+
+				callButton = createCallButton();
+
 				//
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
@@ -187,8 +222,18 @@
 				if ( intersections.length > 0 ) {
 
 					const intersection = intersections[ 0 ];
+					
 
 					const object = intersection.object;
+
+					if(object === callButton && callInitiated !== true){
+						callInitiated = true;
+						connectToHiFiAudio()
+						return;
+					}
+
+
+
 					object.material.emissive.b = 1;
 					controller.attach( object );
 
@@ -282,6 +327,53 @@
 				renderer.render( scene, camera );
 
 			}
+
+			async function connectToHiFiAudio(stream) {
+            // Disable the Connect button after the user clicks it so we don't double-connect.
+            //connectButton.disabled = true;
+            //connectButton.innerHTML = `Connecting...`;
+
+            // Get the audio media stream associated with the user's default audio input device.
+            let audioMediaStream;
+            try {
+                audioMediaStream = await navigator.mediaDevices.getUserMedia({ audio: HighFidelityAudio.getBestAudioConstraints(), video: false });
+            } catch (e) {
+                return;
+            }
+
+            // Set up the initial data for our user.
+            // They'll be standing at the origin, facing "forward".
+            let initialHiFiAudioAPIData = new HighFidelityAudio.HiFiAudioAPIData({
+                position: new HighFidelityAudio.Point3D({ "x": 0, "y": 0, "z": 0 }),
+                orientationEuler: new HighFidelityAudio.OrientationEuler3D({ "pitch": 0, "yaw": 0, "roll": 0 })
+            });
+
+            // Set up our `HiFiCommunicator` object, supplying our media stream and initial user data.
+            let hifiCommunicator = new HighFidelityAudio.HiFiCommunicator({
+                initialHiFiAudioAPIData: initialHiFiAudioAPIData
+            });
+            await hifiCommunicator.setInputAudioMediaStream(audioMediaStream);
+
+            // Connect to the HiFi Audio API server!
+            // Supply your own JWT here.
+            const HIFI_AUDIO_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBfaWQiOiJhZmJiNGI3MS0yODY0LTRkNDQtYjA5ZS0xZDQwOGE5MjYyNzQiLCJzcGFjZV9pZCI6Ijc2MTE1ODBhLTk1OWMtNDU2Ni1hODRmLTQxMWMzZjNhN2QwOCIsInVzZXJfaWQiOiJHb29leSBUZXN0IElEIiwic3RhY2siOiJhdWRpb25ldC1taXhlci1hcGktYWxwaGEtMDEifQ.vuoq0gVeEilQRfrE7VRETaZ35ylMqg0rqVOxAInM4fQ";
+            try {
+                await hifiCommunicator.connectToHiFiAudioAPIServer(HIFI_AUDIO_JWT);
+            } catch (e) {
+                console.error(`Error connecting to High Fidelity:\n${e}`);
+                //connectButton.disabled = false;
+                //connectButton.innerHTML = `Connection error. Retry?`;
+                return;
+            }
+
+            // Show the user that we're connected by changing the text on the button.
+            //connectButton.innerHTML = `Connected!`;
+
+            // Set the `srcObject` on our `audio` DOM element to the final, mixed audio stream from the High Fidelity Audio API Server.
+            document.querySelector(`.outputAudioEl`).srcObject = hifiCommunicator.getOutputAudioMediaStream();
+            // We explicitly call `play()` here because certain browsers won't play the newly-set stream automatically.
+            document.querySelector(`.outputAudioEl`).play();
+        }
 
 		</script>
 	</body>

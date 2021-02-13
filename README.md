@@ -24,5 +24,15 @@ https://<your IP>:3000
 # You'll land on a webpage with the list of demos
 # Try each demo
 
+### Development
 
- - 
+**Debug Quest 2 Web Pages**
+Read this basically: https://developer.oculus.com/documentation/oculus-browser/browser-remote-debugging/
+
+ 1. Install Android Platform Tools so you can debug the Oculus Browser from your development machine
+ ```brew install android-platform-tools```
+
+**High Fidelity**
+
+ - Developer panel: https://account.highfidelity.com/dev/account
+ - https://docs.highfidelity.com/latest/index.html
