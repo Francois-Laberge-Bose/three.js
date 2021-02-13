@@ -70,7 +70,9 @@
     "test-unit": "npm run unit --prefix test",
     "test-e2e": "node test/e2e/puppeteer.js",
     "test-e2e-cov": "node test/e2e/check-coverage.js",
-    "make-screenshot": "node test/e2e/puppeteer.js --make"
+    "make-screenshot": "node test/e2e/puppeteer.js --make",
+    "server": "python -m SimpleHTTPServer 8080",
+    "proxy": "local-ssl-proxy --source 3000 --target 8080"
   },
   "keywords": [
     "three",
