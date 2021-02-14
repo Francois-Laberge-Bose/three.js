@@ -326,54 +326,165 @@
 
 				renderer.render( scene, camera );
 
+
+
+
+				transmitHiFiAudioAPIDataToMixer();
 			}
 
+			let transmitHiFiAudioAPIDataToMixer = ()=>{};
+
 			async function connectToHiFiAudio(stream) {
-            // Disable the Connect button after the user clicks it so we don't double-connect.
-            //connectButton.disabled = true;
-            //connectButton.innerHTML = `Connecting...`;
+				// Disable the Connect button after the user clicks it so we don't double-connect.
+				//connectButton.disabled = true;
+				//connectButton.innerHTML = `Connecting...`;
 
-            // Get the audio media stream associated with the user's default audio input device.
-            let audioMediaStream;
-            try {
-                audioMediaStream = await navigator.mediaDevices.getUserMedia({ audio: HighFidelityAudio.getBestAudioConstraints(), video: false });
-            } catch (e) {
-                return;
-            }
+				// Get the audio media stream associated with the user's default audio input device.
+				let audioMediaStream;
+				try {
+					audioMediaStream = await navigator.mediaDevices.getUserMedia({ audio: HighFidelityAudio.getBestAudioConstraints(), video: false });
+				} catch (e) {
+					return;
+				}
 
-            // Set up the initial data for our user.
-            // They'll be standing at the origin, facing "forward".
-            let initialHiFiAudioAPIData = new HighFidelityAudio.HiFiAudioAPIData({
-                position: new HighFidelityAudio.Point3D({ "x": 0, "y": 0, "z": 0 }),
-                orientationEuler: new HighFidelityAudio.OrientationEuler3D({ "pitch": 0, "yaw": 0, "roll": 0 })
-            });
+				let currentPosition = new HighFidelityAudio.Point3D({ "x": 0, "y": 0, "z": 0 });
+				let currentOrientationEuler = new HighFidelityAudio.OrientationEuler3D({ "pitchDegrees": 0, "yawDegrees": 0, "rollDegrees": 0 });
 
-            // Set up our `HiFiCommunicator` object, supplying our media stream and initial user data.
-            let hifiCommunicator = new HighFidelityAudio.HiFiCommunicator({
-                initialHiFiAudioAPIData: initialHiFiAudioAPIData
-            });
-            await hifiCommunicator.setInputAudioMediaStream(audioMediaStream);
+				// Set up the initial data for our user.
+				// They'll be standing at the origin, facing "forward".
+				let initialHiFiAudioAPIData = new HighFidelityAudio.HiFiAudioAPIData({
+					position: currentPosition,
+					orientationEuler: currentOrientationEuler
+				});
 
-            // Connect to the HiFi Audio API server!
-            // Supply your own JWT here.
-            const HIFI_AUDIO_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBfaWQiOiJhZmJiNGI3MS0yODY0LTRkNDQtYjA5ZS0xZDQwOGE5MjYyNzQiLCJzcGFjZV9pZCI6Ijc2MTE1ODBhLTk1OWMtNDU2Ni1hODRmLTQxMWMzZjNhN2QwOCIsInVzZXJfaWQiOiJHb29leSBUZXN0IElEIiwic3RhY2siOiJhdWRpb25ldC1taXhlci1hcGktYWxwaGEtMDEifQ.vuoq0gVeEilQRfrE7VRETaZ35ylMqg0rqVOxAInM4fQ";
-            try {
-                await hifiCommunicator.connectToHiFiAudioAPIServer(HIFI_AUDIO_JWT);
-            } catch (e) {
-                console.error(`Error connecting to High Fidelity:\n${e}`);
-                //connectButton.disabled = false;
-                //connectButton.innerHTML = `Connection error. Retry?`;
-                return;
-            }
+				// Set up our `HiFiCommunicator` object, supplying our media stream and initial user data.
+				let hifiCommunicator = new HighFidelityAudio.HiFiCommunicator({
+					initialHiFiAudioAPIData: initialHiFiAudioAPIData
+				});
+				await hifiCommunicator.setInputAudioMediaStream(audioMediaStream);
 
-            // Show the user that we're connected by changing the text on the button.
-            //connectButton.innerHTML = `Connected!`;
+				let newUserDataSubscription = new HighFidelityAudio.UserDataSubscription({
+					"components": [
+						HighFidelityAudio.AvailableUserDataSubscriptionComponents.Position,
+						HighFidelityAudio.AvailableUserDataSubscriptionComponents.OrientationEuler,
+						HighFidelityAudio.AvailableUserDataSubscriptionComponents.VolumeDecibels
+					],
+					"callback": (receivedHiFiAudioAPIDataArray) => {
+						onNewUserDataReceived(receivedHiFiAudioAPIDataArray);
+					}
+				});
+				hifiCommunicator.addUserDataSubscription(newUserDataSubscription);
 
-            // Set the `srcObject` on our `audio` DOM element to the final, mixed audio stream from the High Fidelity Audio API Server.
-            document.querySelector(`.outputAudioEl`).srcObject = hifiCommunicator.getOutputAudioMediaStream();
-            // We explicitly call `play()` here because certain browsers won't play the newly-set stream automatically.
-            document.querySelector(`.outputAudioEl`).play();
-        }
+				// Connect to the HiFi Audio API server!
+				// Supply your own JWT here.
+				const HIFI_AUDIO_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBfaWQiOiJhZmJiNGI3MS0yODY0LTRkNDQtYjA5ZS0xZDQwOGE5MjYyNzQiLCJzcGFjZV9pZCI6Ijc2MTE1ODBhLTk1OWMtNDU2Ni1hODRmLTQxMWMzZjNhN2QwOCIsInVzZXJfaWQiOiJHb29leSBUZXN0IElEIiwic3RhY2siOiJhdWRpb25ldC1taXhlci1hcGktYWxwaGEtMDEifQ.vuoq0gVeEilQRfrE7VRETaZ35ylMqg0rqVOxAInM4fQ";
+				try {
+					await hifiCommunicator.connectToHiFiAudioAPIServer(HIFI_AUDIO_JWT);
+				} catch (e) {
+					console.error(`Error connecting to High Fidelity:\n${e}`);
+					//connectButton.disabled = false;
+					//connectButton.innerHTML = `Connection error. Retry?`;
+					return;
+				}
+
+				// Show the user that we're connected by changing the text on the button.
+				//connectButton.innerHTML = `Connected!`;
+
+				// Set the `srcObject` on our `audio` DOM element to the final, mixed audio stream from the High Fidelity Audio API Server.
+				document.querySelector(`.outputAudioEl`).srcObject = hifiCommunicator.getOutputAudioMediaStream();
+				// We explicitly call `play()` here because certain browsers won't play the newly-set stream automatically.
+				document.querySelector(`.outputAudioEl`).play();
+
+				let eulerConverter = new THREE.Euler();
+				transmitHiFiAudioAPIDataToMixer = () => {
+					if (!hifiCommunicator) {
+						return;
+					}
+					currentPosition.x = camera.matrixWorld.getPosition().x;
+					currentPosition.y = camera.matrixWorld.getPosition().y;
+					currentPosition.z = camera.matrixWorld.getPosition().z;
+
+					eulerConverter.setFromRotationMatrix(camera.matrixWorld);
+
+					currentOrientationEuler.pitchDegrees = THREE.Math.radToDeg(eulerConverter.x);
+					currentOrientationEuler.yawDegrees = THREE.Math.radToDeg(eulerConverter.y);
+					currentOrientationEuler.rollDegrees = THREE.Math.radToDeg(eulerConverter.z);
+
+					hifiCommunicator.updateUserDataAndTransmit({
+						position: currentPosition,
+						orientationEuler: currentOrientationEuler,
+					});
+				}
+
+				function onNewUserDataReceived(receivedHiFiAudioAPIDataArray) {
+					let dataUpdated = false;
+
+					for (let recdItr = 0; recdItr < receivedHiFiAudioAPIDataArray.length; recdItr++) {
+						let currentDataFromServer = receivedHiFiAudioAPIDataArray[recdItr];
+						//console.log(currentDataFromServer);
+
+						// We can't do anything with user data that doesn't contain a User ID or Hashed Visit ID.
+						if (!currentDataFromServer.providedUserID && !currentDataFromServer.hashedVisitID) {
+							continue;
+						}
+
+						let isNewUser = true;
+						//for (let allItr = 0; allItr < allUserDataFromServer.length; allItr++) {
+							// if ((currentDataFromServer.providedUserID && currentDataFromServer.providedUserID === allUserDataFromServer[allItr].providedUserID) ||
+							//     currentDataFromServer.hashedVisitID && currentDataFromServer.hashedVisitID === allUserDataFromServer[allItr].hashedVisitID) {
+							//     isNewUser = false;
+							//     dataUpdated = true;
+
+							//     if (currentDataFromServer.position) {
+							//         if (!allUserDataFromServer[allItr].position) {
+							//             allUserDataFromServer[allItr].position = new HighFidelityAudio.Point3D();
+							//         }
+
+							//         if (typeof (currentDataFromServer.position.x) === "number") {
+							//             allUserDataFromServer[allItr].position.x = currentDataFromServer.position.x;
+							//         }
+							//         if (typeof (currentDataFromServer.position.y) === "number") {
+							//             allUserDataFromServer[allItr].position.y = currentDataFromServer.position.y;
+							//         }
+							//         if (typeof (currentDataFromServer.position.z) === "number") {
+							//             allUserDataFromServer[allItr].position.z = currentDataFromServer.position.z;
+							//         }
+							//     }
+
+							//     if (currentDataFromServer.orientationEuler) {
+							//         if (!allUserDataFromServer[allItr].orientationEuler) {
+							//             allUserDataFromServer[allItr].orientationEuler = new HighFidelityAudio.OrientationEuler3D();
+							//         }
+
+							//         if (typeof (currentDataFromServer.orientationEuler.pitchDegrees) === "number") {
+							//             allUserDataFromServer[allItr].orientationEuler.pitchDegrees = currentDataFromServer.orientationEuler.pitchDegrees;
+							//         }
+							//         if (typeof (currentDataFromServer.orientationEuler.yawDegrees) === "number") {
+							//             allUserDataFromServer[allItr].orientationEuler.yawDegrees = currentDataFromServer.orientationEuler.yawDegrees;
+							//         }
+							//         if (typeof (currentDataFromServer.orientationEuler.rollDegrees) === "number") {
+							//             allUserDataFromServer[allItr].orientationEuler.rollDegrees = currentDataFromServer.orientationEuler.rollDegrees;
+							//         }
+							//     }
+
+							//     if (typeof (currentDataFromServer.volumeDecibels) === "number") {
+							//         allUserDataFromServer[allItr].volumeDecibels = currentDataFromServer.volumeDecibels;
+							//     }
+							//     break;
+							// }
+						//}
+
+						if (isNewUser) {
+							//allUserDataFromServer.push(currentDataFromServer);
+							dataUpdated = true;
+						}
+					}
+
+					// if (dataUpdated) {
+					//     updateAllUserDataDiv();
+					// }
+				}
+			}
 
 		</script>
 	</body>

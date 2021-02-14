@@ -31,6 +31,7 @@ Read this basically: https://developer.oculus.com/documentation/oculus-browser/b
 
  1. Install Android Platform Tools so you can debug the Oculus Browser from your development machine
  ```brew install android-platform-tools```
+ 1. Open: chrome://inspect/#devices
 
 **High Fidelity**
 
