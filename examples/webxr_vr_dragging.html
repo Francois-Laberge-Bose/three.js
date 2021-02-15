@@ -41,9 +41,21 @@
 			let controls, group;
 			let callButton;
 			let callInitiated = false;
+			let createTalkerCube = ()=>{};
 
 			init();
 			animate();
+
+			let connectedByKeydown = false;
+			document.addEventListener('keydown', (event)=>{
+				
+				if( event.keyCode !== 32 || connectedByKeydown ){
+					return;
+				}
+				connectedByKeydown = true;
+
+				connectToHiFiAudio();
+			})
 
 			function init() {
 
@@ -122,10 +134,38 @@
 
 				}
 
+
 				function createCallButton(){
 					const geometry = geometries[ 0 ];
 					const material = new THREE.MeshStandardMaterial( {
 						color: 0xff0000,
+						roughness: 0.7,
+						metalness: 0.0
+					} );
+
+					const object = new THREE.Mesh( geometry, material );
+
+					object.position.x = 0;
+					object.position.y = 1;
+					object.position.z = -1;
+
+					object.rotation.x = 0;
+					object.rotation.y = 0;
+					object.rotation.z = 0;
+
+					object.scale.setScalar( 1.0 );
+
+					object.castShadow = true;
+					object.receiveShadow = true;
+
+					group.add( object );
+					return object;
+				}
+
+				createTalkerCube = () => {
+					const geometry = geometries[ 0 ];
+					const material = new THREE.MeshStandardMaterial( {
+						color: 0x0000ff,
 						roughness: 0.7,
 						metalness: 0.0
 					} );
@@ -324,6 +364,13 @@
 				intersectObjects( controller1 );
 				intersectObjects( controller2 );
 
+				// Synchronize head positions/orientations
+				allUserDataFromServer.forEach( (user) =>{
+					user.headCube.position.x = user.position.x;
+					user.headCube.position.y = user.position.y;
+					user.headCube.position.z = user.position.z;
+				})
+
 				renderer.render( scene, camera );
 
 
@@ -333,6 +380,7 @@
 			}
 
 			let transmitHiFiAudioAPIDataToMixer = ()=>{};
+			let allUserDataFromServer = [];
 
 			async function connectToHiFiAudio(stream) {
 				// Disable the Connect button after the user clicks it so we don't double-connect.
@@ -396,15 +444,21 @@
 				document.querySelector(`.outputAudioEl`).play();
 
 				let eulerConverter = new THREE.Euler();
+				let positionConverter = new THREE.Vector3();
 				transmitHiFiAudioAPIDataToMixer = () => {
 					if (!hifiCommunicator) {
 						return;
 					}
-					currentPosition.x = camera.matrixWorld.getPosition().x;
-					currentPosition.y = camera.matrixWorld.getPosition().y;
-					currentPosition.z = camera.matrixWorld.getPosition().z;
+
+					positionConverter.setFromMatrixColumn( camera.matrixWorld, 3 );
+
+					currentPosition.x = positionConverter.x;
+					currentPosition.y = positionConverter.y;
+					currentPosition.z = positionConverter.z;
+					//console.log( currentPosition.x, currentPosition.y, currentPosition.z );
 
 					eulerConverter.setFromRotationMatrix(camera.matrixWorld);
+					
 
 					currentOrientationEuler.pitchDegrees = THREE.Math.radToDeg(eulerConverter.x);
 					currentOrientationEuler.yawDegrees = THREE.Math.radToDeg(eulerConverter.y);
@@ -416,6 +470,7 @@
 					});
 				}
 
+				
 				function onNewUserDataReceived(receivedHiFiAudioAPIDataArray) {
 					let dataUpdated = false;
 
@@ -429,53 +484,54 @@
 						}
 
 						let isNewUser = true;
-						//for (let allItr = 0; allItr < allUserDataFromServer.length; allItr++) {
-							// if ((currentDataFromServer.providedUserID && currentDataFromServer.providedUserID === allUserDataFromServer[allItr].providedUserID) ||
-							//     currentDataFromServer.hashedVisitID && currentDataFromServer.hashedVisitID === allUserDataFromServer[allItr].hashedVisitID) {
-							//     isNewUser = false;
-							//     dataUpdated = true;
+						for (let allItr = 0; allItr < allUserDataFromServer.length; allItr++) {
+							if ((currentDataFromServer.providedUserID && currentDataFromServer.providedUserID === allUserDataFromServer[allItr].providedUserID) ||
+							    currentDataFromServer.hashedVisitID && currentDataFromServer.hashedVisitID === allUserDataFromServer[allItr].hashedVisitID) {
+							    isNewUser = false;
+							    dataUpdated = true;
 
-							//     if (currentDataFromServer.position) {
-							//         if (!allUserDataFromServer[allItr].position) {
-							//             allUserDataFromServer[allItr].position = new HighFidelityAudio.Point3D();
-							//         }
+							    if (currentDataFromServer.position) {
+							        if (!allUserDataFromServer[allItr].position) {
+							            allUserDataFromServer[allItr].position = new HighFidelityAudio.Point3D();
+							        }
 
-							//         if (typeof (currentDataFromServer.position.x) === "number") {
-							//             allUserDataFromServer[allItr].position.x = currentDataFromServer.position.x;
-							//         }
-							//         if (typeof (currentDataFromServer.position.y) === "number") {
-							//             allUserDataFromServer[allItr].position.y = currentDataFromServer.position.y;
-							//         }
-							//         if (typeof (currentDataFromServer.position.z) === "number") {
-							//             allUserDataFromServer[allItr].position.z = currentDataFromServer.position.z;
-							//         }
-							//     }
+							        if (typeof (currentDataFromServer.position.x) === "number") {
+							            allUserDataFromServer[allItr].position.x = currentDataFromServer.position.x;
+							        }
+							        if (typeof (currentDataFromServer.position.y) === "number") {
+							            allUserDataFromServer[allItr].position.y = currentDataFromServer.position.y;
+							        }
+							        if (typeof (currentDataFromServer.position.z) === "number") {
+							            allUserDataFromServer[allItr].position.z = currentDataFromServer.position.z;
+							        }
+							    }
 
-							//     if (currentDataFromServer.orientationEuler) {
-							//         if (!allUserDataFromServer[allItr].orientationEuler) {
-							//             allUserDataFromServer[allItr].orientationEuler = new HighFidelityAudio.OrientationEuler3D();
-							//         }
+							    if (currentDataFromServer.orientationEuler) {
+							        if (!allUserDataFromServer[allItr].orientationEuler) {
+							            allUserDataFromServer[allItr].orientationEuler = new HighFidelityAudio.OrientationEuler3D();
+							        }
 
-							//         if (typeof (currentDataFromServer.orientationEuler.pitchDegrees) === "number") {
-							//             allUserDataFromServer[allItr].orientationEuler.pitchDegrees = currentDataFromServer.orientationEuler.pitchDegrees;
-							//         }
-							//         if (typeof (currentDataFromServer.orientationEuler.yawDegrees) === "number") {
-							//             allUserDataFromServer[allItr].orientationEuler.yawDegrees = currentDataFromServer.orientationEuler.yawDegrees;
-							//         }
-							//         if (typeof (currentDataFromServer.orientationEuler.rollDegrees) === "number") {
-							//             allUserDataFromServer[allItr].orientationEuler.rollDegrees = currentDataFromServer.orientationEuler.rollDegrees;
-							//         }
-							//     }
+							        if (typeof (currentDataFromServer.orientationEuler.pitchDegrees) === "number") {
+							            allUserDataFromServer[allItr].orientationEuler.pitchDegrees = currentDataFromServer.orientationEuler.pitchDegrees;
+							        }
+							        if (typeof (currentDataFromServer.orientationEuler.yawDegrees) === "number") {
+							            allUserDataFromServer[allItr].orientationEuler.yawDegrees = currentDataFromServer.orientationEuler.yawDegrees;
+							        }
+							        if (typeof (currentDataFromServer.orientationEuler.rollDegrees) === "number") {
+							            allUserDataFromServer[allItr].orientationEuler.rollDegrees = currentDataFromServer.orientationEuler.rollDegrees;
+							        }
+							    }
 
-							//     if (typeof (currentDataFromServer.volumeDecibels) === "number") {
-							//         allUserDataFromServer[allItr].volumeDecibels = currentDataFromServer.volumeDecibels;
-							//     }
-							//     break;
-							// }
-						//}
+							    if (typeof (currentDataFromServer.volumeDecibels) === "number") {
+							        allUserDataFromServer[allItr].volumeDecibels = currentDataFromServer.volumeDecibels;
+							    }
+							    break;
+							}
+						}
 
 						if (isNewUser) {
-							//allUserDataFromServer.push(currentDataFromServer);
+							currentDataFromServer.headCube = createTalkerCube();
+							allUserDataFromServer.push(currentDataFromServer);
 							dataUpdated = true;
 						}
 					}
