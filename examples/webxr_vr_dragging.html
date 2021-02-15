@@ -42,6 +42,8 @@
 			let callButton;
 			let callInitiated = false;
 			let createTalkerCube = ()=>{};
+			let eulerConverter = new THREE.Euler();
+			let positionConverter = new THREE.Vector3();
 
 			init();
 			animate();
@@ -180,7 +182,11 @@
 					object.rotation.y = 0;
 					object.rotation.z = 0;
 
-					object.scale.setScalar( 1.0 );
+					object.scale.x = 0.2;
+					object.scale.y = 0.3;
+					object.scale.z = 0.2;
+
+					object.matrixAutoUpdate = false;
 
 					object.castShadow = true;
 					object.receiveShadow = true;
@@ -366,13 +372,30 @@
 
 				// Synchronize head positions/orientations
 				allUserDataFromServer.forEach( (user) =>{
-					user.headCube.position.x = user.position.x;
-					user.headCube.position.y = user.position.y;
-					user.headCube.position.z = user.position.z;
+					if( user.position !== null &&
+						user.orientationEuler !== null &&
+						user.position.x !== undefined &&
+						user.position.y !== undefined &&
+						user.position.z !== undefined && 
+						user.orientationEuler.pitchDegrees &&
+						user.orientationEuler.yawDegrees &&
+						user.orientationEuler.rollDegrees ){
+
+						eulerConverter.x = THREE.Math.degToRad(user.orientationEuler.pitchDegrees);
+						eulerConverter.y = THREE.Math.degToRad(user.orientationEuler.yawDegrees);
+						eulerConverter.z = THREE.Math.degToRad(user.orientationEuler.rollDegrees);
+						user.headCube.matrix.makeRotationFromEuler(eulerConverter);
+
+						user.headCube.matrix.setPosition(new THREE.Vector3(
+							user.position.x,
+							user.position.y,
+							user.position.z
+						))
+					}
 				})
 
 				renderer.render( scene, camera );
-
+				//console.log(allUserDataFromServer.length);
 
 
 
@@ -443,8 +466,6 @@
 				// We explicitly call `play()` here because certain browsers won't play the newly-set stream automatically.
 				document.querySelector(`.outputAudioEl`).play();
 
-				let eulerConverter = new THREE.Euler();
-				let positionConverter = new THREE.Vector3();
 				transmitHiFiAudioAPIDataToMixer = () => {
 					if (!hifiCommunicator) {
 						return;
@@ -480,14 +501,17 @@
 
 						// We can't do anything with user data that doesn't contain a User ID or Hashed Visit ID.
 						if (!currentDataFromServer.providedUserID && !currentDataFromServer.hashedVisitID) {
+							//console.log("skipped");
 							continue;
+						} else {
+							//console.log(currentDataFromServer.providedUserID, currentDataFromServer.hashedVisitID);
 						}
 
-						let isNewUser = true;
+						let isNewUser = allUserDataFromServer.findIndex( user => user.hashedVisitID === currentDataFromServer.hashedVisitID ) === -1;
 						for (let allItr = 0; allItr < allUserDataFromServer.length; allItr++) {
 							if ((currentDataFromServer.providedUserID && currentDataFromServer.providedUserID === allUserDataFromServer[allItr].providedUserID) ||
 							    currentDataFromServer.hashedVisitID && currentDataFromServer.hashedVisitID === allUserDataFromServer[allItr].hashedVisitID) {
-							    isNewUser = false;
+							    //isNewUser = false;
 							    dataUpdated = true;
 
 							    if (currentDataFromServer.position) {
@@ -530,6 +554,7 @@
 						}
 
 						if (isNewUser) {
+							console.log("New User", currentDataFromServer.hashedVisitID);
 							currentDataFromServer.headCube = createTalkerCube();
 							allUserDataFromServer.push(currentDataFromServer);
 							dataUpdated = true;
